@@ -102,8 +102,8 @@ defmodule Docker.Images do
       %HTTPoison.AsyncStatus{id: _id, code: code} ->
         case code do
           200 -> {[{:status, {:ok}}], :pulling}
-          404 -> {[{:status, {:error, "Repository does not exist or no read access"}}], :end}
-          500 -> {[{:status, {:error, "Server error"}}], :end}
+          404 -> {[{:status, {:error, "Repository does not exist or no read access"}}], :pulled}
+          500 -> {[{:status, {:error, "Server error"}}], :pulled}
         end
       %HTTPoison.AsyncHeaders{id: _id, headers: _headers} ->
         {[{:headers}], :pulling}
