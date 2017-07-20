@@ -40,8 +40,8 @@ defmodule Docker.Images do
   def pull(image), do: pull(image, "latest")
   def pull(image, tag) do
     url = "#{@base_uri}/create?fromImage=#{image}&tag=#{tag}"
-    Docker.Client.stream(:post, url)
-    handle_pull()
+    %HTTPoison.AsyncResponse{id: id} = Docker.Client.stream(:post, url)
+    handle_pull(id)
   end
 
   @doc """
@@ -50,8 +50,8 @@ defmodule Docker.Images do
   def pull(image, tag, auth) do
     headers = auth_headers(auth)
     url = "#{@base_uri}/create?fromImage=#{image}&tag=#{tag}"
-    Docker.Client.stream(:post, url, headers)
-    handle_pull()
+    %HTTPoison.AsyncResponse{id: id} = Docker.Client.stream(:post, url, headers)
+    handle_pull(id)
   end
 
   defp auth_headers(auth) do
@@ -61,19 +61,19 @@ defmodule Docker.Images do
     }
   end
 
-  defp handle_pull do
+  defp handle_pull(id) do
     receive do
-      %HTTPoison.AsyncStatus{id: _id, code: code} ->
+      %HTTPoison.AsyncStatus{id: ^id, code: code} ->
         case code do
-          200 -> handle_pull()
+          200 -> handle_pull(id)
           404 -> {:error, "Repository does not exist or no read access"}
           500 -> {:error, "Server error"}
         end
-      %HTTPoison.AsyncHeaders{id: _id, headers: _headers} ->
-        handle_pull()
-      %HTTPoison.AsyncChunk{id: _id, chunk: _chunk} ->
-        handle_pull()
-      %HTTPoison.AsyncEnd{id: _id} ->
+      %HTTPoison.AsyncHeaders{id: ^id, headers: _headers} ->
+        handle_pull(id)
+      %HTTPoison.AsyncChunk{id: ^id, chunk: _chunk} ->
+        handle_pull(id)
+      %HTTPoison.AsyncEnd{id: ^id} ->
         {:ok, "Image successfully pulled"}
     end
   end
@@ -91,7 +91,10 @@ defmodule Docker.Images do
     {:ok, stream}
   end
 
-  defp stream_pull(image, tag, auth) do
+  @doc """
+  Pull a Docker image and return the response in a stream after authenticating.
+  """
+  def stream_pull(image, tag, auth) do
     headers = auth_headers(auth)
     stream = Stream.resource(
       fn -> start_pull("#{@base_uri}/create?fromImage=#{image}&tag=#{tag}", headers) end,
