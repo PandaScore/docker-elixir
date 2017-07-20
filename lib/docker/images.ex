@@ -77,12 +77,41 @@ defmodule Docker.Images do
   end
 
   @doc """
-  Pull a Docker image as stream. Deprecated.
+  Pull a Docker image and return the response in a stream. 
   """
-  def pull_stream(image), do: pull_stream(image, "latest")
-  def pull_stream(image, tag) do
-    url = "#{@base_uri}/create?fromImage=#{image}&tag=#{tag}"
+  def stream_pull(image), do: stream_pull(image, "latest")
+  def stream_pull(image, tag) do
+    stream = Stream.resource(
+      fn -> start_pull("#{@base_uri}/create?fromImage=#{image}&tag=#{tag}") end,
+      fn x -> receive_pull(x) end,
+      fn _ -> end
+    )
+    {:ok, stream}
+  end
+
+  defp start_pull(url) do
     Docker.Client.stream(:post, url)
+    :pulling
+  end
+
+  defp receive_pull(:pulled) do
+    {:halt, nil}
+  end
+  defp receive_pull(:pulling) do
+    receive do
+      %HTTPoison.AsyncStatus{id: _id, code: code} ->
+        case code do
+          200 -> {[{:status, {:ok}}], :pulling}
+          404 -> {[{:status, {:error, "Repository does not exist or no read access"}}], :end}
+          500 -> {[{:status, {:error, "Server error"}}], :end}
+        end
+      %HTTPoison.AsyncHeaders{id: _id, headers: _headers} ->
+        {[{:headers}], :pulling}
+      %HTTPoison.AsyncChunk{id: _id, chunk: _chunk} ->
+        {[{:chunk}], :pulling}
+      %HTTPoison.AsyncEnd{id: _id} ->
+        {[{:end}], :pulled}
+    end
   end
 
   @doc """
