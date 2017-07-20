@@ -60,8 +60,10 @@ defmodule Docker.Misc do
   Return real-time events from server as a stream.
   """
   def stream_events do
+    %HTTPoison.AsyncResponse{id: id} = Docker.Client.stream(:get, "/events")
+
     stream = Stream.resource(
-      fn -> start_streaming_events("/events") end,
+      fn -> {id, :streaming} end,
       fn({id, status}) -> receive_events({id, status}) end,
       fn _ -> nil end
     )
