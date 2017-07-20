@@ -13,9 +13,22 @@ defmodule ClientTest do
     assert {:ok, _} = Docker.Misc.ping()
   end
 
-  # test "get events and stream response" do
-  #   {:ok, stream} = Docker.Misc.stream_events()
-  #   Enum.map(stream, fn elem -> send(self(), elem)  end)
-  #   assert_receive {:event}
-  # end
+  test "get events and stream response" do
+    conf =  %{"AttachStdin" => false,
+      "Env" => [],
+      "Image" => "hello-world:latest",
+      "Volumes" => %{},
+      "ExposedPorts" => %{},
+    }
+
+    {:ok, stream} = Docker.Misc.stream_events()
+    parent = self()
+    spawn(fn -> 
+      Enum.map(stream, fn event -> send(parent, event) end) 
+    end)
+    {:ok, %{"Id" => id}} = Docker.Containers.create(conf)
+    assert_receive {:ok, _}
+    assert_receive {:event, %{"Action" => "create"}}
+    Docker.Containers.remove(id)
+  end
 end
