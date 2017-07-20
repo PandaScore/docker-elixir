@@ -48,7 +48,7 @@ defmodule Docker.Misc do
   def events(since), do: Docker.Client.get("/events?since=#{since}")
   
   @doc """
-  Monitor Docker's events as stream.
+  Monitor Docker's events as stream. LEGACY.
   """
   def events_stream, do: Docker.Client.stream(:get, "/events")
   def events_stream(filter) do
