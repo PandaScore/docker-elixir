@@ -83,34 +83,34 @@ defmodule Docker.Images do
   def stream_pull(image, tag) do
     stream = Stream.resource(
       fn -> start_pull("#{@base_uri}/create?fromImage=#{image}&tag=#{tag}") end,
-      fn x -> receive_pull(x) end,
+      fn({id, status}) -> receive_pull({id, status}) end,
       fn _ -> end
     )
     {:ok, stream}
   end
 
   defp start_pull(url) do
-    Docker.Client.stream(:post, url)
-    :pulling
+    %HTTPoison.AsyncResponse{id: id} = Docker.Client.stream(:post, url)
+    {id, :pulling}
   end
 
-  defp receive_pull(:pulled) do
+  defp receive_pull({id, :pulled}) do
     {:halt, nil}
   end
-  defp receive_pull(:pulling) do
+  defp receive_pull({id, :pulling}) do
     receive do
-      %HTTPoison.AsyncStatus{id: _id, code: code} ->
+      %HTTPoison.AsyncStatus{id: ^id, code: code} ->
         case code do
-          200 -> {[{:status, {:ok}}], :pulling}
-          404 -> {[{:status, {:error, "Repository does not exist or no read access"}}], :pulled}
-          500 -> {[{:status, {:error, "Server error"}}], :pulled}
+          200 -> {[{:status, {:ok}}], {id, :pulling}}
+          404 -> {[{:status, {:error, "Repository does not exist or no read access"}}], {id, :pulled}}
+          500 -> {[{:status, {:error, "Server error"}}], {id, :pulled}}
         end
-      %HTTPoison.AsyncHeaders{id: _id, headers: _headers} ->
-        {[{:headers}], :pulling}
-      %HTTPoison.AsyncChunk{id: _id, chunk: _chunk} ->
-        {[{:chunk}], :pulling}
-      %HTTPoison.AsyncEnd{id: _id} ->
-        {[{:end}], :pulled}
+      %HTTPoison.AsyncHeaders{id: ^id, headers: _headers} ->
+        {[{:headers}], {id, :pulling}}
+      %HTTPoison.AsyncChunk{id: ^id, chunk: _chunk} ->
+        {[{:chunk}], {id, :pulling}}
+      %HTTPoison.AsyncEnd{id: ^id} ->
+        {[{:end}], {id, :pulled}}
     end
   end
 
