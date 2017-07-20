@@ -21,9 +21,8 @@ defmodule ImagesTest do
   test "pull image and stream response" do
     {:ok, stream} = Docker.Images.stream_pull(@test_image, @test_image_tag)
     Enum.map(stream, fn elem -> send(self(), elem)  end)
-    assert_receive {:status, {:ok}}
-    assert_receive {:headers}
-    assert_receive {:chunk}
+    assert_receive {:ok}
+    assert_receive {:pulling, _status}
     assert_receive {:end}
   end
 

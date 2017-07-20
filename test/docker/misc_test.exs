@@ -12,4 +12,10 @@ defmodule ClientTest do
   test "ping" do
     assert {:ok, _} = Docker.Misc.ping()
   end
+
+  # test "get events and stream response" do
+  #   {:ok, stream} = Docker.Misc.stream_events()
+  #   Enum.map(stream, fn elem -> send(self(), elem)  end)
+  #   assert_receive {:event}
+  # end
 end

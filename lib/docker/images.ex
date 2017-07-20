@@ -101,16 +101,17 @@ defmodule Docker.Images do
     receive do
       %HTTPoison.AsyncStatus{id: ^id, code: code} ->
         case code do
-          200 -> {[{:status, {:ok}}], {id, :pulling}}
-          404 -> {[{:status, {:error, "Repository does not exist or no read access"}}], {id, :pulled}}
-          500 -> {[{:status, {:error, "Server error"}}], {id, :pulled}}
+          200 -> {[{:ok, "Started pulling"}], {id, :pulling}}
+          404 -> {[{:error, "Repository does not exist or no read access"}], {id, :pulled}}
+          500 -> {[{:error, "Server error"}], {id, :pulled}}
         end
       %HTTPoison.AsyncHeaders{id: ^id, headers: _headers} ->
-        {[{:headers}], {id, :pulling}}
-      %HTTPoison.AsyncChunk{id: ^id, chunk: _chunk} ->
-        {[{:chunk}], {id, :pulling}}
+        {[], {id, :pulling}}
+      %HTTPoison.AsyncChunk{id: ^id, chunk: chunk} ->
+        {:ok, %{"status" => status}} = Poison.decode(chunk)
+        {[{:pulling, status}], {id, :pulling}}
       %HTTPoison.AsyncEnd{id: ^id} ->
-        {[{:end}], {id, :pulled}}
+        {[{:end, "Finished pulling"}], {id, :pulled}}
     end
   end
 
