@@ -30,6 +30,14 @@ defmodule ImagesTest do
     {:ok, _} = Docker.Images.pull(@test_image, @test_image_tag, "username:password")
   end
 
+  test "auth and pull image and stream response" do
+    {:ok, stream} = Docker.Images.stream_pull(@test_image, @test_image_tag, "username:password")
+    Enum.map(stream, fn elem -> send(self(), elem)  end)
+    assert_receive {:ok, _}
+    assert_receive {:pulling, _}
+    assert_receive {:end, _}
+  end
+
   test "inspect image" do
     {:ok, _} = Docker.Images.pull(@test_image, @test_image_tag)
     {:ok, _} = Docker.Images.inspect(@test_image)

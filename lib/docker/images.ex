@@ -48,15 +48,17 @@ defmodule Docker.Images do
   Pull a Docker image from the repo after authenticating.
   """
   def pull(image, tag, auth) do
-    auth_header = auth |> Poison.encode! |> Base.encode64
-    headers = %{
-      "X-Registry-Auth" => auth_header,
-      "Content-Type" => "application/json"
-    }
-
+    headers = auth_headers(auth)
     url = "#{@base_uri}/create?fromImage=#{image}&tag=#{tag}"
     Docker.Client.stream(:post, url, headers)
     handle_pull()
+  end
+
+  defp auth_headers(auth) do
+    %{
+      "X-Registry-Auth" => auth |> Poison.encode! |> Base.encode64,
+      "Content-Type" => "application/json"
+    }
   end
 
   defp handle_pull do
@@ -84,7 +86,17 @@ defmodule Docker.Images do
     stream = Stream.resource(
       fn -> start_pull("#{@base_uri}/create?fromImage=#{image}&tag=#{tag}") end,
       fn({id, status}) -> receive_pull({id, status}) end,
-      fn _ -> end
+      fn _ -> nil end
+    )
+    {:ok, stream}
+  end
+
+  defp stream_pull(image, tag, auth) do
+    headers = auth_headers(auth)
+    stream = Stream.resource(
+      fn -> start_pull("#{@base_uri}/create?fromImage=#{image}&tag=#{tag}", headers) end,
+      fn({id, status}) -> receive_pull({id, status}) end,
+      fn _ -> nil end
     )
     {:ok, stream}
   end
@@ -94,7 +106,12 @@ defmodule Docker.Images do
     {id, :pulling}
   end
 
-  defp receive_pull({id, :pulled}) do
+  defp start_pull(url, headers) do
+    %HTTPoison.AsyncResponse{id: id} = Docker.Client.stream(:post, url, headers)
+    {id, :pulling}
+  end
+
+  defp receive_pull({_id, :pulled}) do
     {:halt, nil}
   end
   defp receive_pull({id, :pulling}) do
